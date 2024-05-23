@@ -23,7 +23,7 @@ class Reddit(commands.Cog):
 
 
     @commands.command(name = "reddit")
-    async def meme(self, ctx, value):
+    async def reddit(self, ctx, value):
         subreddit = reddit.subreddit(value)
         all_subs = []
 
@@ -37,21 +37,34 @@ class Reddit(commands.Cog):
         url = random_sub.url
         
         em = discord.Embed(title = name)
-        
-        if hasattr(random_sub, 'post_hint') and random_sub.post_hint == 'image':
-            em.set_image(url = url)
-        
-        elif random_sub.is_video:
-            print("The post has an embedded video.")
-            em.add_field(name="Video", value=f"[Watch here]({random_sub.url})", inline=False)
-            
-        elif random_sub.media:
-            await ctx.send(url)
-            return
+        try:
+            if not random_sub.over_18:
+                if hasattr(random_sub, 'post_hint') and random_sub.post_hint == 'image':
+                    em.set_image(url = url)
 
-        await ctx.send(embed = em)
-        
-        hot = 0
+                elif random_sub.is_video:
+                    print("The post has an embedded video.")
+                    em.add_field(name="Video", value=f"[Watch here]({random_sub.url})", inline=False)
+
+                elif random_sub.media:
+                    await ctx.send(url)
+                    return
+
+                if random_sub.selftext:
+                    em.add_field(name="Text Content", value=random_sub.selftext, inline=False)
+
+                await ctx.send(embed = em)
+
+            else:
+                await ctx.send("That post was marked as NSFW and will not be sent")
+        except discord.HTTPException as e:
+            if e.code == 50035:
+                await ctx.send("Error: The text content is too long to display.")
+            else:
+                await ctx.send(f"An unexpected error occurred: {e}")
+    
+        except Exception as e:
+            await ctx.send(f"An error occurred: {e}")
 
 async def setup(client):
     await client.add_cog(Reddit(client))
