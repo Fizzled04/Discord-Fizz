@@ -17,6 +17,7 @@ def _save():
 
 amounts = {}
 
+
 #Coinflip class
 
 class CoinflipView(View):
@@ -57,21 +58,25 @@ class Gambling(commands.Cog):
 
     #Load money section
 
-    @commands.Cog.listener()
-    async def on_ready(self):
+class Gambling(commands.Cog):
+    def __init__(self, client):
+       self.client = client
+
+    def cog_load(self):
         global amounts
         if os.path.exists('amounts.json'):
             try:
                 with open('amounts.json') as f:
                     amounts = json.load(f)
                     print("Loaded amounts from JSON: ", amounts)
-            except json.JSONDecoder:
-                print("Could not read the json")
+            except json.JSONDecodeError:
+                print("Could not read the JSON file")
                 amounts = {}
         else:
             print("JSON file not found, initializing empty amounts")
             amounts = {}
-
+            
+            
     #General Command Section for moneys
 
     @commands.hybrid_command()
@@ -79,9 +84,11 @@ class Gambling(commands.Cog):
         id = str(ctx.message.author.id)
         if id not in amounts:
             amounts[id] = 50
+            _save()
         
         await ctx.send("You have {} Sheckles.".format(amounts[id]))
-
+        
+        
     @commands.hybrid_command()
     async def pay(self, ctx, amount: int, other: discord.Member):
         main_id = str(ctx.message.author.id)
@@ -124,19 +131,31 @@ class Gambling(commands.Cog):
             view = CoinflipView(ctx, main_id, other_id, amount)
             msg = await ctx.send(embed=embed, view=view)
             await view.wait()
-            
+             
             if view.result:
                 chosen_side = random.choice(["blue", "red"])
-                time.sleep(3)
-                if chosen_side == view.result:
-                    newest_embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"The coin had landed on **{chosen_side}**. <@{other_id}> won! They have earned **{amount*2}** sheckles!", color=discord.Color.blue())
-                    amounts[main_id] -= amount
-                    amounts[other_id] += amount
-                else:
-                    newest_embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"The coin had landed on **{chosen_side}**. <@{main_id}> won! They have earned **{amount*2}** sheckles!", color=discord.Color.blue())
-                    await msg.edit(embed=newest_embed)
-                    amounts[main_id] += amount
-                    amounts[other_id] -= amount
+                asyncio.create_task(self.delayed_edit(ctx, msg, main_id, other_id, amount, chosen_side, view.result))
+            
+    async def delayed_edit(self, ctx, msg, main_id, other_id, amount, chosen_side, result):
+        await asyncio.sleep(3)
+        if chosen_side == result:
+            newest_embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"The coin had landed on **{chosen_side}**. <@{other_id}> won! They have earned **{amount*2}** sheckles!", color=discord.Color.blue())
+            amounts[main_id] -= amount
+            amounts[other_id] += amount
+        else:
+            newest_embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"The coin had landed on **{chosen_side}**. <@{main_id}> won! They have earned **{amount*2}** sheckles!", color=discord.Color.blue())
+            amounts[main_id] += amount
+            amounts[other_id] -= amount
+        
+        await msg.edit(embed=newest_embed)
+        _save()
+
+    #Blackjack Command section
+    
+    @commands.hybrid_command()
+    async def blackjack(self, ctx, amount: int):
+        embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"🃔")
+        await ctx.send(embed=embed)
 
 async def setup(client):
     await client.add_cog(Gambling(client))
