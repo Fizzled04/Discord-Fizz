@@ -137,65 +137,6 @@ class Gambling(commands.Cog):
                     await msg.edit(embed=newest_embed)
                     amounts[main_id] += amount
                     amounts[other_id] -= amount
-        '''main_id = str(ctx.message.author.id)
-        other_id = str(other.id)
-        
-        if main_id not in amounts:
-            amounts[main_id] = 50
-        if other_id not in amounts:
-            amounts[other_id] = 50
-        if amounts[main_id] < amount:
-            await ctx.send("You can't afford this coinflip")
-        elif amounts[other_id] < amount:
-            await ctx.send(f"<@{other_id}> can't afford this coinflip")
-        else:
-            
-            
-            
-            sent_message = await ctx.send(f"<@{ctx.message.author.id}> chose {player1}. Do you accept this coinflip? (yes/no)")
-            number = 1
-            while number == 1:
-                try:
-                    res = await self.client.wait_for(
-                    "message",
-                    check=lambda x: x.channel.id == ctx.channel.id
-                    and other.id == x.author.id
-                    and x.content.lower() == "yes"
-                    or x.conetent.lower() == "no",
-                    timeout = 10,
-                    )
-                    if res.content.lower() == "yes":
-                        await ctx.send(f"<@{other_id}> has accepted the coinflip")
-                        time.sleep(1)
-                        if random.choice([0,1]) == 1:
-                            embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"The coin has landed **HEADS**")
-                            await ctx.send(embed=embed)
-                            if player1 == "heads":
-                                await ctx.send(f"<@{main_id}> has won the coinflip")
-                                amounts[main_id] += amount
-                                amounts[other_id] -= amount
-                            else:
-                                await ctx.send(f"<@{other_id}> has won the coinflip")
-                                amounts[main_id] -= amount
-                                amounts[other_id] += amount
-                        else:
-                            embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"The coin has landed **TAILS**")
-                            await ctx.send(embed=embed)
-                            if player1 == "tails":
-                                await ctx.send(f"<@{main_id}> has won the coinflip")
-                                amounts[main_id] += amount
-                                amounts[other_id] -= amount
-                            else:
-                                await ctx.send(f"<@{other_id}> has won the coinflip")
-                                amounts[main_id] -= amount
-                                amounts[other_id] += amount
-
-                    elif res.content.lower() == "no":
-                        await ctx.send(f"<@{other_id}> has declined the coinflip")
-                        number = 0
-                except asyncio.TimeoutError:
-                    number = 0
-        _save()'''
 
 async def setup(client):
     await client.add_cog(Gambling(client))
