@@ -2,15 +2,16 @@ import os
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
+from discord import app_commands
+
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-intents = discord.Intents.default()
+intents = discord.Intents.all()
 intents.message_content = True
 
 client = commands.Bot(command_prefix = '>', case_insensitive=True, intents=intents)
-
 
 async def load_extensions():
     for filename in os.listdir('./cogs'):
@@ -34,10 +35,15 @@ async def reload(ctx, extension):
 @client.event
 async def setup_hook():
     await load_extensions()
+    await client.tree.sync()
 
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user}')
+    
+@client.hybrid_command(name="first_slash")
+async def first_slash(ctx):
+    await ctx.send("command")
 
 
 @client.event

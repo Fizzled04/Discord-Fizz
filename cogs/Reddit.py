@@ -22,7 +22,7 @@ class Reddit(commands.Cog):
         self.client = client
 
 
-    @commands.command(name = "reddit")
+    @commands.hybrid_command(name = "reddit")
     async def reddit(self, ctx, value):
         subreddit = reddit.subreddit(value)
         all_subs = []
@@ -38,7 +38,7 @@ class Reddit(commands.Cog):
         
         em = discord.Embed(title = name)
         try:
-            if not random_sub.over_18:
+
                 if hasattr(random_sub, 'post_hint') and random_sub.post_hint == 'image':
                     em.set_image(url = url)
 
@@ -55,8 +55,7 @@ class Reddit(commands.Cog):
 
                 await ctx.send(embed = em)
 
-            else:
-                await ctx.send("That post was marked as NSFW and will not be sent")
+            
         except discord.HTTPException as e:
             if e.code == 50035:
                 await ctx.send("Error: The text content is too long to display.")
