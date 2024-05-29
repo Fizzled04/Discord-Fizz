@@ -75,7 +75,7 @@ class CoinflipView(View):
         self.stop()
 
     async def on_timeout(self):
-        await self.ctx.send(f"<@{self.other_id}> did not respond in time.")
+        await self.ctx.send(f"<@{self.other_id}> did not respond in time.", ephemeral=True)
 
 
 class BlackjackView(View):
@@ -85,7 +85,9 @@ class BlackjackView(View):
         self.main_id = main_id
         self.amount = amount
         self.result = None
-    
+        self.hitChecker = False
+        self.splitChecker = False
+        
         self.blackjackDeck = {
                             'Ah':11, 'Ad':11, 'As':11, 'Ac':11,
                             'Kh':10, 'Kd':10, 'Ks':10, 'Kc':10,
@@ -103,27 +105,32 @@ class BlackjackView(View):
                             }
 
         self.dealerHand = {}
-        self.playerMainHand = {}
+        self.playerHands = [{}]
+        self.currentHand = 0
+        self.splitCount = 0
+        self.handResults = []
 
+        amounts[main_id] -= self.amount
+        
+        
         for _ in range(2):
                 card, value = deal_card(self.blackjackDeck)
-                self.playerMainHand[card] = value
+                self.playerHands[0][card] = value
                 card, value = deal_card(self.blackjackDeck)
                 self.dealerHand[card] = value
 
-        self.dealerHandStr = " ".join([deckDict[card] for card in self.dealerHand])
         self.dealerHandStrHidden = " ".join([deckDict[card]])
-        self.playerHandMainStr = " ".join([deckDict[card] for card in self.playerMainHand])
+        self.update_hand_strings()
 
         self.embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStrHidden}<:blank:1244303337315369073>\n\nPlayer: {self.playerHandMainStr}", color=discord.Color.blue())
         
-        playerMainCurrentValue = calculate_hand_value(self.playerMainHand)
+        playerMainCurrentValue = calculate_hand_value(self.playerHands[0])
         delearCurrentValue = calculate_hand_value(self.dealerHand)
         
         if(playerMainCurrentValue == 21):
             if(delearCurrentValue != 21):
                 payout = round(self.amount*3/2)
-                self.embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr} \n\nYou got blackjack! You've been paid out **{payout}** chips!", color=discord.Color.gold())
+                self.embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr} \n\nYou got blackjack! You've been paid out **{payout+self.amount}** chips!", color=discord.Color.gold())
                 amounts[self.main_id] += payout+self.amount
             else:
                 self.embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr} \n\nYou both got blackjack! You've recieved your chips back.", color=discord.Color.blue())
@@ -133,6 +140,11 @@ class BlackjackView(View):
             self.embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr} \n\nSorry, the dealer got blackjack, you lost.", color=discord.Color.red())
             self.stop()
 
+    def update_hand_strings(self):
+        self.dealerHandStr = " ".join([deckDict[card] for card in self.dealerHand])
+        self.playerHandMainStr = " ".join([deckDict[card] for card in self.playerHands[self.currentHand]])
+        self.playerHandStrings = [" ".join([deckDict[card] for card in hand]) for hand in self.playerHands]
+
     def is_soft_17(self, hand):
         value = sum(hand.values())
         return value == 17 and any(card.startswith('A') and hand[card] == 11 for card in hand)
@@ -140,83 +152,112 @@ class BlackjackView(View):
     @discord.ui.button(label="Hit", style=discord.ButtonStyle.green)
     async def green_button(self, interaction: discord.Interaction, button: Button):
         await self.process_choice(interaction, "hit")
-    @discord.ui.button(label="Stand", style=discord.ButtonStyle.grey)
+    @discord.ui.button(label="Stand", style=discord.ButtonStyle.red)
     async def grey_button(self, interaction: discord.Interaction, button: Button):
         await self.process_choice(interaction, "stand")
-    @discord.ui.button(label="Double", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="Double", style=discord.ButtonStyle.blurple)
     async def red_button(self, interaction: discord.Interaction, button: Button):
         await self.process_choice(interaction, "double")
-    @discord.ui.button(label="Split", style=discord.ButtonStyle.blurple)
-    async def blurple_button(self, interaction: discord.Interaction, button: Button):
-        await self.process_choice(interaction, "split")
     async def process_choice(self, interaction: discord.Interaction, choice: str):
         if int(interaction.user.id) != int(self.main_id):
             await interaction.response.send_message("You are not the one playing!", ephemeral=True)
             return
         self.result = choice
+            
+        
         if(self.result == "hit"):
-            card, value = deal_card(self.blackjackDeck)
-            self.playerMainHand[card] = value
-            self.playerHandMainStr += f" {deckDict[card]}" 
-            playerMainCurrentValue = calculate_hand_value(self.playerMainHand)
-            if(playerMainCurrentValue > 21):
-                new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStrHidden}<:blank:1244303337315369073>\n\nPlayer: {self.playerHandMainStr}\n\nYou **BUSTED** and have lost your chips.", color=discord.Color.red())
-                self.stop()
-            else:
-                new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStrHidden}<:blank:1244303337315369073>\n\nPlayer: {self.playerHandMainStr}", color=discord.Color.blue())
+            await self.handle_hit(interaction)
+        
         elif(self.result == "stand"):
-            new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr}", color=discord.Color.blue())
-            dealerCurrentValue = calculate_hand_value(self.dealerHand)
-            playerMainCurrentValue = calculate_hand_value(self.playerMainHand)
-            while(dealerCurrentValue < 17 | self.is_soft_17(self.dealerHand)):
-                card, value = deal_card(self.blackjackDeck)
-                self.dealerHand[card] = value
-                self.dealerHandStr += f" {deckDict[card]}"
-                dealerCurrentValue = calculate_hand_value(self.dealerHand)
-                new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr}", color=discord.Color.blue())
-            dealerCurrentValue = calculate_hand_value(self.dealerHand)
-            if(dealerCurrentValue < playerMainCurrentValue or dealerCurrentValue > 21):
-                new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr}\n\nCongratulations you **WON** you've been paid out **{self.amount}** chips!", color=discord.Color.green())
-                self.stop()
-            elif(dealerCurrentValue > playerMainCurrentValue):
-                new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr}\n\nYou **LOST** and have lost your chips.", color=discord.Color.red())
-                self.stop()
-            else:
-                new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr}\n\nYou **TIED** and have recieved your chips back.", color=discord.Color.blue())
-                self.stop()
+            await self.handle_stand(interaction)
+        
         elif(self.result == "double"):
+            await self.handle_double(interaction)
+        
+            
+    
+    async def handle_hit(self, interaction: discord.Interaction):
+        card, value = deal_card(self.blackjackDeck)
+        self.playerHands[self.currentHand][card] = value
+        self.update_hand_strings()
+        playerMainCurrentValue = calculate_hand_value(self.playerHands[self.currentHand])
+        
+        if(playerMainCurrentValue > 21):
+            new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStrHidden}<:blank:1244303337315369073>\n\nPlayer: {self.playerHandStrings[self.currentHand]}\n\nYou **BUSTED** and have lost your chips.", color=discord.Color.red())
+            self.stop()
+        else:
+            new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStrHidden}<:blank:1244303337315369073>\n\nPlayer: {self.playerHandStrings[self.currentHand]}", color=discord.Color.blue())
+        self.hitChecker = True
+        await interaction.response.edit_message(embed=new_embed)
+
+    async def handle_stand(self, interaction: discord.Interaction):
+        
+        self.handResults.append(self.playerHands[self.currentHand])
+        
+        new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandStrings[self.currentHand]}", color=discord.Color.blue())
+        dealerCurrentValue = calculate_hand_value(self.dealerHand)
+        playerMainCurrentValue = calculate_hand_value(self.playerHands[self.currentHand])
+        await self.dealer_turn()
+        dealerCurrentValue = calculate_hand_value(self.dealerHand)
+        if(dealerCurrentValue < playerMainCurrentValue or dealerCurrentValue > 21):
+            new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandStrings[self.currentHand]}\n\nCongratulations you **WON** you've been paid out **{self.amount*2}** chips!", color=discord.Color.green())
+            amounts[self.main_id] += self.amount*2
+            self.stop()
+        elif(dealerCurrentValue > playerMainCurrentValue):
+            new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandStrings[self.currentHand]}\n\nYou **LOST** and have lost your chips.", color=discord.Color.red())
+            self.stop()
+        else:
+            new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandStrings[self.currentHand]}\n\nYou **TIED** and have recieved your chips back.", color=discord.Color.blue())
+            amounts[self.main_id] += self.amount
+            self.stop()
+        await interaction.response.edit_message(embed=new_embed)
+
+    async def handle_double(self, interaction: discord.Interaction):
+        if(amounts[self.main_id] < self.amount):
+            await interaction.response.send_message("You can not afford to double.", ephemeral=True)
+            return
+        elif(self.hitChecker == False):
+            amounts[self.main_id] -= self.amount
+            self.amount *= 2
             card, value = deal_card(self.blackjackDeck)
-            self.playerMainHand[card] = value
-            self.playerHandMainStr += f" {deckDict[card]}"
-            playerMainCurrentValue = calculate_hand_value(self.playerMainHand)
+            self.playerHands[self.currentHand][card] = value
+            self.update_hand_strings()
+            playerMainCurrentValue = calculate_hand_value(self.playerHands[self.currentHand])
+            
             if(playerMainCurrentValue > 21):
-                new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStrHidden}<:blank:1244303337315369073>\n\nPlayer: {self.playerHandMainStr}\n\nYou **BUSTED** and have lost your chips.", color=discord.Color.red())
+                new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStrHidden}<:blank:1244303337315369073>\n\nPlayer: {self.playerHandStrings[self.currentHand]}\n\nYou **BUSTED** and have lost your chips.", color=discord.Color.red())
                 self.stop()
             else:
-                new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr}", color=discord.Color.blue())
-                dealerCurrentValue = calculate_hand_value(self.dealerHand)
-                while(dealerCurrentValue < 17 or self.is_soft_17(self.dealerHand)):
-                    card, value = deal_card(self.blackjackDeck)
-                    self.dealerHand[card] = value
-                    self.dealerHandStr += f" {deckDict[card]}"
-                    dealerCurrentValue = calculate_hand_value(self.dealerHand)
-                    new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr}", color=discord.Color.blue())
+                new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandStrings[self.currentHand]}", color=discord.Color.blue())
+                await self.dealer_turn()
                 dealerCurrentValue = calculate_hand_value(self.dealerHand)
                 if(dealerCurrentValue < playerMainCurrentValue or dealerCurrentValue > 21):
-                    new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr}\n\nCongratulations you **WON** you've been paid out **{self.amount*2}** chips!", color=discord.Color.green())
-                    print(dealerCurrentValue)
+                    new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandStrings[self.currentHand]}\n\nCongratulations you **WON** you've been paid out **{self.amount*2}** chips!", color=discord.Color.green())
+                    amounts[self.main_id] += self.amount*2
                     self.stop()
                 elif(dealerCurrentValue > playerMainCurrentValue):
-                    new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr}\n\nYou **LOST** and have lost your chips.", color=discord.Color.red())
+                    new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandStrings[self.currentHand]}\n\nYou **LOST** and have lost your chips.", color=discord.Color.red())
                     self.stop()
                 else:
-                    new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr}\n\nYou **TIED** and have recieved your chips back.", color=discord.Color.blue())
+                    new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandStrings[self.currentHand]}\n\nYou **TIED** and have recieved your chips back.", color=discord.Color.blue())
+                    amounts[self.main_id] += self.amount
                     self.stop()
+            await interaction.response.edit_message(embed=new_embed)
+        else:
+            await interaction.response.send_message("You have already hit, you cannot double.", ephemeral=True)
+            return
+
+    async def dealer_turn(self):
+        dealerCurrentValue = calculate_hand_value(self.dealerHand)
+
+        while dealerCurrentValue < 17 or self.is_soft_17(self.dealerHand):
+            card, value = deal_card(self.blackjackDeck)
+            self.dealerHand[card] = value
+            dealerCurrentValue = calculate_hand_value(self.dealerHand)
+        self.update_hand_strings()
         
-        await interaction.response.edit_message(embed=new_embed)
     async def on_timeout(self):
-        amounts[self.main_id] += self.amount
-        await self.ctx.send(f"<@{self.main_id}> did not respond in time, you have been refunded your chips.")
+        await self.ctx.send(f"You did not respond in time, you have lost your chips.", ephemeral=True)
         
 
 
@@ -339,6 +380,8 @@ class Gambling(commands.Cog):
             view = BlackjackView(ctx, main_id, amount)
             await msg.edit(embed=view.embed, view=view)
             await view.wait()
+            _save()
+            
 
 async def setup(client):
     await client.add_cog(Gambling(client))
