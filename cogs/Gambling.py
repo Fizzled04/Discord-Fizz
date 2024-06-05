@@ -8,7 +8,7 @@ import random
 import json
 import os
 import asyncio
-import time
+from datetime import datetime, timedelta
 
 def _save():
     print(f"Saving amounts to {'amounts.json'}: {amounts}")
@@ -16,6 +16,82 @@ def _save():
         json.dump(amounts, f)
 
 amounts = {}
+daily_cooldowns = {}
+
+def generate_random_slot(elements):
+    #creates a board
+    random.shuffle(elements)
+    board = [elements[i:i+3] for i in range(0, 9, 3)]
+    return board
+
+def generate_losing_slot(elements):
+    #ensures board is losing
+    def is_valid(board):
+        for i in range(3):
+            if board[i][0] == board[i][1] == board[i][2]:
+                return False
+            if board[0][i] == board[1][i] == board[2][i]:
+                return False
+        if board[0][0] == board[1][1] == board[2][2]:
+            return False
+        if board[0][2] == board[1][1] == board[2][0]:
+            return False
+        return True
+
+    while True:
+        #repeatedly generates boards until one is losing
+        random.shuffle(elements)
+        board = [elements[i:i+3] for i in range(0, 9, 3)]
+        if is_valid(board):
+            return board    
+
+def generate_winning_slot(elements, winningSymbol):
+    def fill_board(board, elements):
+        idx = 0
+        for i in range(3):
+            for j in range(3):
+                if board[i][j] is None:
+                    board[i][j] = elements[idx]
+                    idx += 1
+        return board
+
+    def is_losing_board(board, winningSymbol):
+        #ensures board is losing besides the desired symbol
+        for i in range(3):
+            if board[i][0] == board[i][1] == board[i][2] and board[i][0] != winningSymbol:
+                return False
+            if board[0][i] == board[1][i] == board[2][i] and board[0][i] != winningSymbol:
+                return False
+        if board[0][0] == board[1][1] == board[2][2] and board[0][0] != winningSymbol:
+            return False
+        if board[0][2] == board[1][1] == board[2][0] and board[0][2] != winningSymbol:
+            return False
+        return True
+
+    elements = [e for e in elements if e != winningSymbol]
+
+    winningPositions = [
+        [(0, 0), (0, 1), (0, 2)],
+        [(1, 0), (1, 1), (1, 2)],
+        [(2, 0), (2, 1), (2, 2)],
+        [(0, 0), (1, 0), (2, 0)],
+        [(0, 1), (1, 1), (2, 1)],
+        [(0, 2), (1, 2), (2, 2)],
+        [(0, 0), (1, 1), (2, 2)],
+        [(0, 2), (1, 1), (2, 0)] 
+    ]
+
+    while True:
+        board = [[None, None, None], [None, None, None], [None, None, None]]
+
+        winningPosition = random.choice(winningPositions)
+        for pos in winningPosition:
+            board[pos[0]][pos[1]] = winningSymbol
+
+        board = fill_board(board, elements[:])
+
+        if is_losing_board(board, winningSymbol):
+            return board
 
 def deal_card(deck):
     card = random.choice(list(deck.keys()))
@@ -46,7 +122,6 @@ deckDict = {'Ah':'<:Ah:1244289577053851759>', 'Ad':'<:Ad:1244289575745228894>', 
             }
 
 #Coinflip class
-
 class CoinflipView(View):
     def __init__(self, ctx, main_id, other_id, amount):
         super().__init__(timeout=30)  # Timeout for the view
@@ -71,6 +146,7 @@ class CoinflipView(View):
         
         self.result = choice
         new_embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"<@{self.other_id}> Has accepted! They have chosen **{self.result}**!", color=discord.Color.blue())
+        new_embed.set_author(name=self.ctx.message.author, icon_url=self.ctx.author.avatar.url)
         await interaction.response.edit_message(embed=new_embed)
         self.stop()
 
@@ -78,6 +154,7 @@ class CoinflipView(View):
         await self.ctx.send(f"<@{self.other_id}> did not respond in time.", ephemeral=True)
 
 
+#Blackjack view + logic
 class BlackjackView(View):
     def __init__(self, ctx, main_id, amount):
         super().__init__(timeout=90)  # Timeout for the view
@@ -123,7 +200,7 @@ class BlackjackView(View):
         self.update_hand_strings()
 
         self.embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStrHidden}<:blank:1244303337315369073>\n\nPlayer: {self.playerHandMainStr}", color=discord.Color.blue())
-        
+        self.embed.set_author(name=self.ctx.message.author, icon_url=self.ctx.author.avatar.url)
         playerMainCurrentValue = calculate_hand_value(self.playerHands[0])
         delearCurrentValue = calculate_hand_value(self.dealerHand)
         
@@ -131,13 +208,16 @@ class BlackjackView(View):
             if(delearCurrentValue != 21):
                 payout = round(self.amount*3/2)
                 self.embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr} \n\nYou got blackjack! You've been paid out **{payout+self.amount}** chips!", color=discord.Color.gold())
+                self.embed.set_author(name=self.ctx.message.author, icon_url=self.ctx.author.avatar.url)
                 amounts[self.main_id] += payout+self.amount
             else:
                 self.embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr} \n\nYou both got blackjack! You've recieved your chips back.", color=discord.Color.blue())
+                self.embed.set_author(name=self.ctx.message.author, icon_url=self.ctx.author.avatar.url)
                 amounts[self.main_id] += self.amount
             self.stop()
         elif(delearCurrentValue == 21):
             self.embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandMainStr} \n\nSorry, the dealer got blackjack, you lost.", color=discord.Color.red())
+            self.embed.set_author(name=self.ctx.message.author, icon_url=self.ctx.author.avatar.url)
             self.stop()
 
     def update_hand_strings(self):
@@ -188,6 +268,7 @@ class BlackjackView(View):
         else:
             new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStrHidden}<:blank:1244303337315369073>\n\nPlayer: {self.playerHandStrings[self.currentHand]}", color=discord.Color.blue())
         self.hitChecker = True
+        new_embed.set_author(name=self.ctx.message.author, icon_url=self.ctx.author.avatar.url)
         await interaction.response.edit_message(embed=new_embed)
 
     async def handle_stand(self, interaction: discord.Interaction):
@@ -210,6 +291,7 @@ class BlackjackView(View):
             new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandStrings[self.currentHand]}\n\nYou **TIED** and have recieved your chips back.", color=discord.Color.blue())
             amounts[self.main_id] += self.amount
             self.stop()
+        new_embed.set_author(name=self.ctx.message.author, icon_url=self.ctx.author.avatar.url)
         await interaction.response.edit_message(embed=new_embed)
 
     async def handle_double(self, interaction: discord.Interaction):
@@ -242,6 +324,7 @@ class BlackjackView(View):
                     new_embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealer: {self.dealerHandStr}\n\nPlayer: {self.playerHandStrings[self.currentHand]}\n\nYou **TIED** and have recieved your chips back.", color=discord.Color.blue())
                     amounts[self.main_id] += self.amount
                     self.stop()
+            new_embed.set_author(name=self.ctx.message.author, icon_url=self.ctx.author.avatar.url)
             await interaction.response.edit_message(embed=new_embed)
         else:
             await interaction.response.send_message("You have already hit, you cannot double.", ephemeral=True)
@@ -254,19 +337,17 @@ class BlackjackView(View):
             card, value = deal_card(self.blackjackDeck)
             self.dealerHand[card] = value
             dealerCurrentValue = calculate_hand_value(self.dealerHand)
-        self.update_hand_strings()
+        self.update_hand_strings()    
         
     async def on_timeout(self):
         await self.ctx.send(f"You did not respond in time, you have lost your chips.", ephemeral=True)
-        
-
-
+                
 class Gambling(commands.Cog):
     def __init__(self, client):
        self.client = client
 
-    #Load money section
 
+#Load money section
 class Gambling(commands.Cog):
     def __init__(self, client):
        self.client = client
@@ -287,7 +368,6 @@ class Gambling(commands.Cog):
             
             
     #General Command Section for moneys
-
     @commands.hybrid_command()
     async def balance(self, ctx):
         id = str(ctx.message.author.id)
@@ -295,7 +375,7 @@ class Gambling(commands.Cog):
             amounts[id] = 50
             _save()
         
-        await ctx.send("You have {} chips.".format(amounts[id]))
+        await ctx.send(f"You have **{amounts[id]}** chips.")
         
         
     @commands.hybrid_command()
@@ -311,12 +391,26 @@ class Gambling(commands.Cog):
         else:
             amounts[main_id] -= amount
             amounts[other_id] += amount
-            await ctx.send("You've successfully sent {amount} chips to <@{other_id}>")
+            await ctx.send(f"You've successfully sent **{amount}** chips to <@{other_id}>")
         _save()
 
     
-    #Coinflip command section
+    #Daily payout command section
+    @commands.hybrid_command()
+    async def daily(self, ctx):
+        main_id = str(ctx.message.author.id)
+        now = datetime.now()
+        if(main_id in daily_cooldowns):
+            lastClaimTime = daily_cooldowns[main_id]
+            nextClaimTime = lastClaimTime + timedelta(days=1)
+            await ctx.send(f"You have already claimed your daily reward. Please try again tomorrow. (12am cst!)", ephemeral=True)
+            return
+        
+        amounts[main_id] += 100
+        daily_cooldowns[main_id] = now
+        await ctx.send(f"You've recieved **100** chips! You can claim your daily again tomorrow! (12am cst!)", ephemeral=True)
     
+    #Coinflip command section
     @commands.hybrid_command()
     async def coinflip(self, ctx, amount: int, opponent: discord.Member):
         main_id = str(ctx.message.author.id)
@@ -328,15 +422,14 @@ class Gambling(commands.Cog):
             amounts[other_id] = 50
         
         if amounts[main_id] < amount:
-            embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"You can't afford this coinflip", color=discord.Color.red())
-            await ctx.send(embed=embed)
+            await ctx.send("You can't afford this coinflip", ephemeral=True)
             return
         elif amounts[other_id] < amount:
-            embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"<@{other_id}> can't afford this coinflip", color=discord.Color.red())
-            await ctx.send(embed=embed)
+            await ctx.send(f"<@{other_id}> can't afford this bet", ephemeral=True)
             return
         else:
             embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"<@{other_id}> You've been challenged to a coinflip for **{amount}** chips!\nPlease pick a side if you wish to accept.", color=discord.Color.blue())
+            embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
             view = CoinflipView(ctx, main_id, other_id, amount)
             msg = await ctx.send(embed=embed, view=view)
             await view.wait()
@@ -344,23 +437,24 @@ class Gambling(commands.Cog):
             if view.result:
                 chosen_side = random.choice(["blue", "red"])
                 asyncio.create_task(self.delayed_edit_coinflip(ctx, msg, main_id, other_id, amount, chosen_side, view.result))
-            
+
+    #Coinflip delay
     async def delayed_edit_coinflip(self, ctx, msg, main_id, other_id, amount, chosen_side, result):
-        await asyncio.sleep(3)
-        if chosen_side == result:
-            newest_embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"The coin had landed on **{chosen_side}**.\n<@{other_id}> won! They have earned **{amount*2}** chips!", color=discord.Color.blue())
-            amounts[main_id] -= amount
-            amounts[other_id] += amount
-        else:
-            newest_embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"The coin had landed on **{chosen_side}**.\n<@{main_id}> won! They have earned **{amount*2}** chips!", color=discord.Color.blue())
-            amounts[main_id] += amount
-            amounts[other_id] -= amount
-        
-        await msg.edit(embed=newest_embed)
-        _save()
+            await asyncio.sleep(3)
+            if chosen_side == result:
+                newest_embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"The coin had landed on **{chosen_side}**.\n<@{other_id}> won! They have earned **{amount*2}** chips!", color=discord.Color.blue())
+                amounts[main_id] -= amount
+                amounts[other_id] += amount
+            else:
+                newest_embed = discord.Embed(title="Coinflip | Fizz Casino", description=f"The coin had landed on **{chosen_side}**.\n<@{main_id}> won! They have earned **{amount*2}** chips!", color=discord.Color.blue())
+                amounts[main_id] += amount
+                amounts[other_id] -= amount
+            newest_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+            await msg.edit(embed=newest_embed)
+            _save()
+
 
     #Blackjack Command section
-    
     @commands.hybrid_command()
     async def blackjack(self, ctx, amount: int):
         main_id = str(ctx.message.author.id)
@@ -369,19 +463,176 @@ class Gambling(commands.Cog):
             amounts[main_id] = 50
         
         if amounts[main_id] < amount:
-            embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"You can't afford this bet", color=discord.Color.red())
-            await ctx.send(embed=embed)
+            await ctx.send("You can't afford this bet", ephemeral=True)
             return
         
         else:
-            embed = discord.Embed(title="Blackjack | Fizz Casino", description=f"Dealing...", color=discord.Color.blue())
+            embed = discord.Embed(title="Blackjack | Fizz Casino", description="Dealing...", color=discord.Color.blue())
             embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
             msg = await ctx.send(embed=embed)
             view = BlackjackView(ctx, main_id, amount)
             await msg.edit(embed=view.embed, view=view)
             await view.wait()
             _save()
+    
+    
+    #Slot Command section
+    @commands.hybrid_command()
+    async def slots(self, ctx, amount: int):
+        main_id = str(ctx.message.author.id)
+        
+        if main_id not in amounts:
+            amounts[main_id] = 50
+        
+        if amount < 5: 
+            await ctx.send("You must bet atleast **5** chips", ephemeral=True)
+            return
             
+        elif amounts[main_id] < amount:
+            await ctx.send("You can't afford this bet", ephemeral=True)
+            return
+        
+        else:
+            slotSymbols = [":broccoli:", ":carrot:", ":grapes:", ":banana:", ":cherries:"]
+            elements = (slotSymbols * 2)[:9]
+            amounts[main_id] -= amount
+            currentBoard = generate_random_slot(elements)
+            embed = discord.Embed(title="Slots | Fizz Casino", description=f"{currentBoard[0][0]} {currentBoard[0][1]} {currentBoard[0][2]}\n{currentBoard[1][0]} {currentBoard[1][1]} {currentBoard[1][2]}\n{currentBoard[2][0]} {currentBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+            embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+            msg = await ctx.send(embed=embed)
+            for _ in range(5):
+                await asyncio.sleep(.35)
+                currentBoard = generate_random_slot(elements)
+                new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{currentBoard[0][0]} {currentBoard[0][1]} {currentBoard[0][2]}\n{currentBoard[1][0]} {currentBoard[1][1]} {currentBoard[1][2]}\n{currentBoard[2][0]} {currentBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                await msg.edit(embed=new_embed)
+            
+            randomNum = random.randint(1, 1000)
+            
+            if randomNum <= 675:
+                currentBoard = generate_losing_slot(elements)
+                finalSlot = currentBoard 
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{finalSlot[0][0]} {currentBoard[0][1]} {currentBoard[0][2]}\n{finalSlot[1][0]} {currentBoard[1][1]} {currentBoard[1][2]}\n{finalSlot[2][0]} {currentBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{finalSlot[0][0]} {finalSlot[0][1]} {currentBoard[0][2]}\n{finalSlot[1][0]} {finalSlot[1][1]} {currentBoard[1][2]}\n{finalSlot[2][0]} {finalSlot[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)    
+                new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{finalSlot[0][0]} {finalSlot[0][1]} {finalSlot[0][2]}\n{finalSlot[1][0]} {finalSlot[1][1]} {finalSlot[1][2]}\n{finalSlot[2][0]} {finalSlot[2][1]} {finalSlot[2][2]}\nYou **LOST** your **{amount}** chips", color=discord.Color.red())
+                new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                await msg.edit(embed=new_embed)
+                 
+            elif randomNum <= 800:
+                winningSymbol = ":broccoli:"
+                winningBoard = generate_winning_slot(elements, winningSymbol)
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {currentBoard[0][1]} {currentBoard[0][2]}\n{winningBoard[1][0]} {currentBoard[1][1]} {currentBoard[1][2]}\n{winningBoard[2][0]} {currentBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {winningBoard[0][1]} {currentBoard[0][2]}\n{winningBoard[1][0]} {winningBoard[1][1]} {currentBoard[1][2]}\n{winningBoard[2][0]} {winningBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)    
+                new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {winningBoard[0][1]} {winningBoard[0][2]}\n{winningBoard[1][0]} {winningBoard[1][1]} {winningBoard[1][2]}\n{winningBoard[2][0]} {winningBoard[2][1]} {winningBoard[2][2]}\nYou **WON** half of your chips(**{round(amount/2)}**) back!", color=discord.Color.yellow())
+                new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                await msg.edit(embed=new_embed)
+                
+                amounts[main_id] += round(amount/2)
+           
+            elif randomNum <= 930:
+                winningSymbol = ":carrot:"
+                winningBoard = generate_winning_slot(elements, winningSymbol)
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {currentBoard[0][1]} {currentBoard[0][2]}\n{winningBoard[1][0]} {currentBoard[1][1]} {currentBoard[1][2]}\n{winningBoard[2][0]} {currentBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {winningBoard[0][1]} {currentBoard[0][2]}\n{winningBoard[1][0]} {winningBoard[1][1]} {currentBoard[1][2]}\n{winningBoard[2][0]} {winningBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)    
+                new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {winningBoard[0][1]} {winningBoard[0][2]}\n{winningBoard[1][0]} {winningBoard[1][1]} {winningBoard[1][2]}\n{winningBoard[2][0]} {winningBoard[2][1]} {winningBoard[2][2]}\nYou **WON** **{amount*2}** chips!", color=discord.Color.green())
+                new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                await msg.edit(embed=new_embed)
+                
+                amounts[main_id] += amount*2
+            
+            elif randomNum <= 970:
+                winningSymbol = ":grapes:"
+                winningBoard = generate_winning_slot(elements, winningSymbol)
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {currentBoard[0][1]} {currentBoard[0][2]}\n{winningBoard[1][0]} {currentBoard[1][1]} {currentBoard[1][2]}\n{winningBoard[2][0]} {currentBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {winningBoard[0][1]} {currentBoard[0][2]}\n{winningBoard[1][0]} {winningBoard[1][1]} {currentBoard[1][2]}\n{winningBoard[2][0]} {winningBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)    
+                new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {winningBoard[0][1]} {winningBoard[0][2]}\n{winningBoard[1][0]} {winningBoard[1][1]} {winningBoard[1][2]}\n{winningBoard[2][0]} {winningBoard[2][1]} {winningBoard[2][2]}\nYou **WON** **{amount*5}** chips!", color=discord.Color.green())
+                new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                await msg.edit(embed=new_embed)
+                
+                amounts[main_id] += amount*5
+            
+            elif randomNum <= 990:
+                winningSymbol = ":banana:"
+                winningBoard = generate_winning_slot(elements, winningSymbol)
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {currentBoard[0][1]} {currentBoard[0][2]}\n{winningBoard[1][0]} {currentBoard[1][1]} {currentBoard[1][2]}\n{winningBoard[2][0]} {currentBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {winningBoard[0][1]} {currentBoard[0][2]}\n{winningBoard[1][0]} {winningBoard[1][1]} {currentBoard[1][2]}\n{winningBoard[2][0]} {winningBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)    
+                new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {winningBoard[0][1]} {winningBoard[0][2]}\n{winningBoard[1][0]} {winningBoard[1][1]} {winningBoard[1][2]}\n{winningBoard[2][0]} {winningBoard[2][1]} {winningBoard[2][2]}\nYou **WON** **{amount*10}** chips!", color=discord.Color.green())
+                new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                await msg.edit(embed=new_embed)
+                
+                amounts[main_id] += amount*10
+            
+            else:
+                winningSymbol = ":cherries:"
+                winningBoard = generate_winning_slot(elements, winningSymbol)
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {currentBoard[0][1]} {currentBoard[0][2]}\n{winningBoard[1][0]} {currentBoard[1][1]} {currentBoard[1][2]}\n{winningBoard[2][0]} {currentBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)
+                for _ in range(4):
+                    await asyncio.sleep(.35)
+                    currentBoard = generate_random_slot(elements)
+                    new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {winningBoard[0][1]} {currentBoard[0][2]}\n{winningBoard[1][0]} {winningBoard[1][1]} {currentBoard[1][2]}\n{winningBoard[2][0]} {winningBoard[2][1]} {currentBoard[2][2]}", color=discord.Color.blue())
+                    new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                    await msg.edit(embed=new_embed)    
+                new_embed = discord.Embed(title="Slots | Fizz Casino", description=f"{winningBoard[0][0]} {winningBoard[0][1]} {winningBoard[0][2]}\n{winningBoard[1][0]} {winningBoard[1][1]} {winningBoard[1][2]}\n{winningBoard[2][0]} {winningBoard[2][1]} {winningBoard[2][2]}\nYou **WON** **{amount*25}** chips!", color=discord.Color.purple())
+                new_embed.set_author(name=ctx.message.author, icon_url=ctx.author.avatar.url)
+                await msg.edit(embed=new_embed)
+                amounts[main_id] += amount*25
+
+            _save()
 
 async def setup(client):
     await client.add_cog(Gambling(client))
