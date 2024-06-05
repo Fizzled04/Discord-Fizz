@@ -123,7 +123,7 @@ deckDict = {'Ah':'<:Ah:1244289577053851759>', 'Ad':'<:Ad:1244289575745228894>', 
 #Coinflip class
 class CoinflipView(View):
     def __init__(self, ctx, main_id, other_id, amount):
-        super().__init__(timeout=30)  # Timeout for the view
+        super().__init__(timeout=30)
         self.ctx = ctx
         self.main_id = main_id
         self.other_id = other_id
@@ -156,7 +156,7 @@ class CoinflipView(View):
 #Blackjack view + logic
 class BlackjackView(View):
     def __init__(self, ctx, main_id, amount):
-        super().__init__(timeout=90)  # Timeout for the view
+        super().__init__(timeout=90)
         self.ctx = ctx
         self.main_id = main_id
         self.amount = amount
@@ -398,13 +398,19 @@ class Gambling(commands.Cog):
     @commands.hybrid_command()
     async def daily(self, ctx):
         main_id = str(ctx.message.author.id)
+        now = datetime.now()
         if(main_id in daily_cooldowns):
-            await ctx.send(f"You have already claimed your daily reward. Please try again tomorrow. (12am cst!)", ephemeral=True)
+            lastClaimTime = daily_cooldowns[main_id]
+            nextClaimTime = lastClaimTime + timedelta(days=1)
+            remaining_time = nextClaimTime - now
+            hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
+            minutes, _ = divmod(remainder, 60)
+            await ctx.send(f"You have already claimed your daily reward. Please try again in {hours} hours and {minutes} minutes.", ephemeral=True)
             return
-        
+
         amounts[main_id] += 150
-        daily_cooldowns[main_id] = True
-        await ctx.send(f"You've recieved **50** chips! You can claim your daily again tomorrow! (12am cst!)", ephemeral=True)
+        daily_cooldowns[main_id] = now
+        await ctx.send(f"You've recieved **150** chips! You can claim your daily again in 24 hours.", ephemeral=True)
     
     #Coinflip command section
     @commands.hybrid_command()

@@ -47,7 +47,7 @@ async def on_ready():
 
 class Help(View):
     def __init__(self, ctx):
-        super().__init__(timeout=180)  # Timeout for the view
+        super().__init__(timeout=180)
         self.ctx = ctx
         self.main_id = self.ctx.author.id
         self.page = 0
