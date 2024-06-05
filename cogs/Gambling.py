@@ -11,7 +11,6 @@ import asyncio
 from datetime import datetime, timedelta
 
 def _save():
-    print(f"Saving amounts to {'amounts.json'}: {amounts}")
     with open('amounts.json', 'w') as f:
         json.dump(amounts, f)
 
@@ -372,10 +371,10 @@ class Gambling(commands.Cog):
     async def balance(self, ctx):
         id = str(ctx.message.author.id)
         if id not in amounts:
-            amounts[id] = 50
+            amounts[id] = 500
             _save()
         
-        await ctx.send(f"You have **{amounts[id]}** chips.")
+        await ctx.send(f"You have **{amounts[id]}** chips.", ephemeral=True)
         
         
     @commands.hybrid_command()
@@ -383,15 +382,15 @@ class Gambling(commands.Cog):
         main_id = str(ctx.message.author.id)
         other_id = str(other.id)
         if main_id not in amounts:
-            amounts[main_id] = 50
+            amounts[main_id] = 500
         if other_id not in amounts:
-            amounts[other_id] = 50
+            amounts[other_id] = 500
         if amounts[main_id] < amount:
-            await ctx.send("You can't afford this transaction")
+            await ctx.send("You can't afford this transaction", ephemeral=True)
         else:
             amounts[main_id] -= amount
             amounts[other_id] += amount
-            await ctx.send(f"You've successfully sent **{amount}** chips to <@{other_id}>")
+            await ctx.send(f"You've successfully sent **{amount}** chips to <@{other_id}>", ephemeral=True)
         _save()
 
     
@@ -399,16 +398,13 @@ class Gambling(commands.Cog):
     @commands.hybrid_command()
     async def daily(self, ctx):
         main_id = str(ctx.message.author.id)
-        now = datetime.now()
         if(main_id in daily_cooldowns):
-            lastClaimTime = daily_cooldowns[main_id]
-            nextClaimTime = lastClaimTime + timedelta(days=1)
             await ctx.send(f"You have already claimed your daily reward. Please try again tomorrow. (12am cst!)", ephemeral=True)
             return
         
-        amounts[main_id] += 100
-        daily_cooldowns[main_id] = now
-        await ctx.send(f"You've recieved **100** chips! You can claim your daily again tomorrow! (12am cst!)", ephemeral=True)
+        amounts[main_id] += 150
+        daily_cooldowns[main_id] = True
+        await ctx.send(f"You've recieved **50** chips! You can claim your daily again tomorrow! (12am cst!)", ephemeral=True)
     
     #Coinflip command section
     @commands.hybrid_command()
@@ -417,9 +413,9 @@ class Gambling(commands.Cog):
         other_id = str(opponent.id)
         
         if main_id not in amounts:
-            amounts[main_id] = 50
+            amounts[main_id] = 500
         if other_id not in amounts:
-            amounts[other_id] = 50
+            amounts[other_id] = 500
         
         if amounts[main_id] < amount:
             await ctx.send("You can't afford this coinflip", ephemeral=True)
@@ -460,7 +456,7 @@ class Gambling(commands.Cog):
         main_id = str(ctx.message.author.id)
         
         if main_id not in amounts:
-            amounts[main_id] = 50
+            amounts[main_id] = 500
         
         if amounts[main_id] < amount:
             await ctx.send("You can't afford this bet", ephemeral=True)
@@ -482,7 +478,7 @@ class Gambling(commands.Cog):
         main_id = str(ctx.message.author.id)
         
         if main_id not in amounts:
-            amounts[main_id] = 50
+            amounts[main_id] = 500
         
         if amount < 5: 
             await ctx.send("You must bet atleast **5** chips", ephemeral=True)
