@@ -390,7 +390,7 @@ class Gambling(commands.Cog):
         else:
             amounts[main_id] -= amount
             amounts[other_id] += amount
-            await ctx.send(f"You've successfully sent **{amount}** chips to <@{other_id}>", ephemeral=True)
+            await ctx.send(f"You've successfully sent **{amount}** chips to <@{other_id}>")
         _save()
 
     
@@ -398,6 +398,9 @@ class Gambling(commands.Cog):
     @commands.hybrid_command()
     async def daily(self, ctx):
         main_id = str(ctx.message.author.id)
+        if main_id not in amounts:
+            amounts[main_id] = 500
+        
         now = datetime.now()
         if(main_id in daily_cooldowns):
             lastClaimTime = daily_cooldowns[main_id]
