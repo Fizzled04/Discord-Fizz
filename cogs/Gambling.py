@@ -375,7 +375,7 @@ class Gambling(commands.Cog):
             amounts[id] = 500
             _save()
         
-        await ctx.send(f"{user.mention} have **{amounts[id]}** chips.", ephemeral=True)
+        await ctx.send(f"{user.mention} has **{amounts[id]}** chips.", ephemeral=True)
         
         
     @commands.hybrid_command()
