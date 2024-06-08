@@ -368,13 +368,14 @@ class Gambling(commands.Cog):
             
     #General Command Section for moneys
     @commands.hybrid_command()
-    async def balance(self, ctx):
-        id = str(ctx.message.author.id)
+    async def balance(self, ctx, user: discord.User = None):
+        user = user or ctx.message.author
+        id = str(user.id)
         if id not in amounts:
             amounts[id] = 500
             _save()
         
-        await ctx.send(f"You have **{amounts[id]}** chips.", ephemeral=True)
+        await ctx.send(f"{user.mention} have **{amounts[id]}** chips.", ephemeral=True)
         
         
     @commands.hybrid_command()
