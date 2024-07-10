@@ -1,0 +1,35 @@
+Privacy Policy for Fizz
+
+Effective Date: 6/5/2024
+
+Introduction
+This Privacy Policy outlines how Fizz ("the Bot") collects, uses, and protects user information. By using the Bot, you agree to the collection and use of information in accordance with this policy.
+
+Information Collection and Use
+The Bot collects certain information from users to provide and improve its services. The information collected includes:
+
+Discord User IDs: Used to identify users and manage in-game activities.
+In-game Statistics: Includes virtual currency balances, game progress, and other related metrics.
+This information is used solely for the purpose of delivering the Bot's services and enhancing user experience.
+
+Data Storage and Security
+The Bot stores collected data securely and implements appropriate measures to protect it from unauthorized access, alteration, disclosure, or destruction. While we strive to use commercially acceptable means to protect your data, no method of transmission over the internet or method of electronic storage is 100% secure.
+
+Data Sharing and Disclosure
+The Bot does not share, sell, or disclose user information to third parties, except in the following circumstances:
+
+Compliance with Legal Obligations: If required by law, we may disclose user information to comply with legal processes or governmental requests.
+Protection of Rights: We may disclose user information to protect our rights, property, or safety, as well as that of our users and others.
+User Rights
+Users have the right to access, correct, or delete their personal information collected by the Bot. To exercise these rights, please contact us at fizzled04 on Discord.
+
+Children's Privacy
+The Bot does not have any age restrictions. However, parental guidance is recommended for younger users. We encourage parents and guardians to monitor their children's use of the Bot.
+
+Changes to this Privacy Policy
+The Bot reserves the right to update or change this Privacy Policy at any time. Changes will be effective immediately upon posting the updated policy. Your continued use of the Bot after any changes signifies your acceptance of the new Privacy Policy.
+
+Contact Information
+If you have any questions or concerns about this Privacy Policy, please contact us at fizzled04 on Discord.
+
+By using Fizz, you acknowledge that you have read, understood, and agree to this Privacy Policy.
