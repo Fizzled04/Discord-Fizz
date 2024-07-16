@@ -9,7 +9,7 @@ from discord.ui import Button, View
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-intents = discord.Intents.all()
+intents = discord.Intents()
 intents.message_content = True
 
 client = commands.Bot(command_prefix = '>', case_insensitive=True, intents=intents, help_command=None)
